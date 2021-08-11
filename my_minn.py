@@ -233,10 +233,36 @@ class SGDTrainer(Trainer):
         for widx, arr in gs.items():
             p.data[widx] -= lrate * arr
 
-
 class MomentumTrainer(Trainer):
-    def __init__(self, model: Model, lrate=0.1, mrate=0.99):
-        raise NotImplementedError
+    def __init__(self, model: Model, lrate:float =0.1, mrate:float=0.99):
+        super().__init__(model)
+        self.lrate = lrate
+        self.mrate = mrate
+        self.state = {}
+        for p in model.params:
+            self.state[p] = Initializer.constant(p.shape)
+    
+    def update(self,):
+        lrate = self.lrate
+        mrate = self.mrate
+        for p in self.model.params:
+            if p.grad is not None:
+                if isinstance(p.grad, dict):  # sparsely update to save time!
+                    self.update_sparse(p, p.grad, lrate, mrate)
+                else:
+                    self.update_dense(p, p.grad, lrate, mrate)
+            p.grad = None
+            
+    def update_sparse(self, p: Parameter, gs: Dict[int, xp.ndarray], lrate: float, mrate:float):
+        for widx, arr in gs.items():
+            self.state[p][widx] = (mrate * self.state[p][widx]) + arr
+            p.data[widx] -= ( self.state[p][widx] * lrate)
+    def update_dense(self, p: Parameter, g: xp.ndarray, lrate:float, mrate:float):
+        self.state[p] = (mrate * self.state[p]) - lrate * g
+        p.data += self.state[p]
+       
+
+# --
 
 # --
 
